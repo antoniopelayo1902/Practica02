@@ -1,0 +1,12 @@
+# Generado por los scripts
+batches/
+dist/
+build/
+OpenSSH_2k.log
+
+# Python
+__pycache__/
+*.pyc
+
+# Sistema
+.DS_Store

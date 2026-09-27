@@ -1,0 +1,178 @@
+{
+  "Comment": "Logging System: descarga el batch de S3, clasifica cada linea (Map) y la guarda en la tabla correspondiente (Choice) con Retry.",
+  "StartAt": "SplitBatch",
+  "States": {
+    "SplitBatch": {
+      "Type": "Task",
+      "Comment": "Lambda que descarga el batch de S3 y lo separa en lineas individuales.",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${SPLIT_LAMBDA_ARN}",
+        "Payload": {
+          "bucket.$": "$.detail.bucket.name",
+          "key.$": "$.detail.object.key"
+        }
+      },
+      "OutputPath": "$.Payload",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Next": "ClassifyLines"
+    },
+
+    "ClassifyLines": {
+      "Type": "Map",
+      "Comment": "Procesa cada linea del batch y la clasifica como normal o sospechosa.",
+      "ItemsPath": "$.lines",
+      "MaxConcurrency": 10,
+      "ResultPath": null,
+      "ItemProcessor": {
+        "ProcessorConfig": { "Mode": "INLINE" },
+        "StartAt": "Classify",
+        "States": {
+          "Classify": {
+            "Type": "Choice",
+            "Comment": "Sospechosa si contiene 'Invalid user' o 'POSSIBLE BREAK-IN ATTEMPT'.",
+            "Choices": [
+              {
+                "Variable": "$.log",
+                "StringMatches": "*POSSIBLE BREAK-IN ATTEMPT*",
+                "Next": "MarkBreakIn"
+              },
+              {
+                "Variable": "$.log",
+                "StringMatches": "*Invalid user*",
+                "Next": "MarkInvalidUser"
+              }
+            ],
+            "Default": "MarkNormal"
+          },
+
+          "MarkBreakIn": {
+            "Type": "Pass",
+            "Result": { "classification": "suspicious", "severity": "HIGH" },
+            "ResultPath": "$.class",
+            "Next": "RouteToTable"
+          },
+          "MarkInvalidUser": {
+            "Type": "Pass",
+            "Result": { "classification": "suspicious", "severity": "MEDIUM" },
+            "ResultPath": "$.class",
+            "Next": "RouteToTable"
+          },
+          "MarkNormal": {
+            "Type": "Pass",
+            "Result": { "classification": "normal", "severity": "NONE" },
+            "ResultPath": "$.class",
+            "Next": "RouteToTable"
+          },
+
+          "RouteToTable": {
+            "Type": "Choice",
+            "Comment": "Dirige la linea a SecurityAlerts si es sospechosa, a Logs si es normal.",
+            "Choices": [
+              {
+                "Variable": "$.class.classification",
+                "StringEquals": "suspicious",
+                "Next": "SaveAlert"
+              }
+            ],
+            "Default": "SaveLog"
+          },
+
+          "SaveAlert": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::dynamodb:putItem",
+            "Parameters": {
+              "TableName": "${ALERTS_TABLE}",
+              "Item": {
+                "id":         { "S.$": "$.id" },
+                "timestamp":  { "S.$": "$.timestamp" },
+                "host":       { "S.$": "$.host" },
+                "log":        { "S.$": "$.log" },
+                "severity":   { "S.$": "$.class.severity" },
+                "raw":        { "S.$": "$.raw" },
+                "arrived_at": { "S.$": "$.arrived_at" },
+                "batch_key":  { "S.$": "$.batch_key" },
+                "line_no":    { "N.$": "States.Format('{}', $.line_no)" }
+              }
+            },
+            "ResultPath": null,
+            "Retry": [
+              {
+                "ErrorEquals": [
+                  "DynamoDB.ProvisionedThroughputExceededException",
+                  "DynamoDB.ThrottlingException",
+                  "DynamoDB.RequestLimitExceeded",
+                  "DynamoDB.InternalServerErrorException"
+                ],
+                "IntervalSeconds": 1,
+                "MaxAttempts": 6,
+                "BackoffRate": 2.0
+              },
+              {
+                "ErrorEquals": [ "States.TaskFailed" ],
+                "IntervalSeconds": 2,
+                "MaxAttempts": 2,
+                "BackoffRate": 2.0
+              }
+            ],
+            "End": true
+          },
+
+          "SaveLog": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::dynamodb:putItem",
+            "Parameters": {
+              "TableName": "${LOGS_TABLE}",
+              "Item": {
+                "id":         { "S.$": "$.id" },
+                "gsi_pk":     { "S.$": "$.gsi_pk" },
+                "arrived_at": { "S.$": "$.arrived_at" },
+                "timestamp":  { "S.$": "$.timestamp" },
+                "host":       { "S.$": "$.host" },
+                "program":    { "S.$": "$.program" },
+                "log":        { "S.$": "$.log" },
+                "raw":        { "S.$": "$.raw" },
+                "batch_key":  { "S.$": "$.batch_key" },
+                "line_no":    { "N.$": "States.Format('{}', $.line_no)" }
+              }
+            },
+            "ResultPath": null,
+            "Retry": [
+              {
+                "ErrorEquals": [
+                  "DynamoDB.ProvisionedThroughputExceededException",
+                  "DynamoDB.ThrottlingException",
+                  "DynamoDB.RequestLimitExceeded",
+                  "DynamoDB.InternalServerErrorException"
+                ],
+                "IntervalSeconds": 1,
+                "MaxAttempts": 6,
+                "BackoffRate": 2.0
+              },
+              {
+                "ErrorEquals": [ "States.TaskFailed" ],
+                "IntervalSeconds": 2,
+                "MaxAttempts": 2,
+                "BackoffRate": 2.0
+              }
+            ],
+            "End": true
+          }
+        }
+      },
+      "End": true
+    }
+  }
+}
