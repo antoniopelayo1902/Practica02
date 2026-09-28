@@ -114,7 +114,7 @@
                   "DynamoDB.ProvisionedThroughputExceededException",
                   "DynamoDB.ThrottlingException",
                   "DynamoDB.RequestLimitExceeded",
-                  "DynamoDB.InternalServerErrorException"
+                  "DynamoDB.InternalServerError"
                 ],
                 "IntervalSeconds": 1,
                 "MaxAttempts": 6,
@@ -155,7 +155,7 @@
                   "DynamoDB.ProvisionedThroughputExceededException",
                   "DynamoDB.ThrottlingException",
                   "DynamoDB.RequestLimitExceeded",
-                  "DynamoDB.InternalServerErrorException"
+                  "DynamoDB.InternalServerError"
                 ],
                 "IntervalSeconds": 1,
                 "MaxAttempts": 6,

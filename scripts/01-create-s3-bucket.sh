@@ -18,9 +18,11 @@ else
       --create-bucket-configuration LocationConstraint="$AWS_REGION" >/dev/null
   fi
   echo "    creado."
+  # El placeholder input/ solo se crea con el bucket nuevo. Si se volviera a
+  # subir en una re-ejecucion (con la regla de EventBridge ya activa),
+  # dispararia una ejecucion vacia de la maquina de estados.
+  aws s3api put-object --bucket "$BUCKET" --key "$INPUT_PREFIX" >/dev/null
 fi
-
-aws s3api put-object --bucket "$BUCKET" --key "$INPUT_PREFIX" >/dev/null
 
 log "Activando notificaciones S3 -> EventBridge"
 aws s3api put-bucket-notification-configuration \

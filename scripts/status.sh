@@ -33,8 +33,11 @@ else
 fi
 
 echo
-if aws dynamodb describe-table --table-name "$LOGS_TABLE" >/dev/null 2>&1; then
-  echo "Conteo aproximado de items (scan):"
-  printf "  %-16s %s\n" "$LOGS_TABLE"   "$(aws dynamodb scan --table-name "$LOGS_TABLE"   --select COUNT --query Count --output text)"
-  printf "  %-16s %s\n" "$ALERTS_TABLE" "$(aws dynamodb scan --table-name "$ALERTS_TABLE" --select COUNT --query Count --output text)"
-fi
+echo "Conteo aproximado de items (scan):"
+for table in "$LOGS_TABLE" "$ALERTS_TABLE"; do
+  if aws dynamodb describe-table --table-name "$table" >/dev/null 2>&1; then
+    printf "  %-16s %s\n" "$table" "$(aws dynamodb scan --table-name "$table" --select COUNT --query Count --output text)"
+  else
+    printf "  %-16s %s\n" "$table" "(no existe)"
+  fi
+done

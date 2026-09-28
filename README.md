@@ -58,7 +58,7 @@ en lugar de un `Scan`.
 
 Las dos tareas `dynamodb:putItem` tienen `Retry` con backoff exponencial para
 `DynamoDB.ProvisionedThroughputExceededException`, `DynamoDB.ThrottlingException`,
-`DynamoDB.RequestLimitExceeded` e `InternalServerErrorException` (6 intentos),
+`DynamoDB.RequestLimitExceeded` y `DynamoDB.InternalServerError` (6 intentos),
 más un segundo bloque para `States.TaskFailed`.
 
 ## Estructura

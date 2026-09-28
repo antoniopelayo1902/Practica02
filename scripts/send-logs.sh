@@ -12,8 +12,16 @@ source "$(dirname "${BASH_SOURCE[0]}")/00-config.sh"
 WAIT_SECONDS="${1:-30}"
 BATCH_DIR="${2:-${ROOT_DIR}/batches}"
 
+# La practica pide no usar menos de 30 segundos entre batches.
+MIN_WAIT_SECONDS=30
+
 if ! [[ "$WAIT_SECONDS" =~ ^[0-9]+$ ]]; then
   echo "ERROR: el primer argumento debe ser el numero de segundos a esperar." >&2
+  exit 1
+fi
+
+if (( WAIT_SECONDS < MIN_WAIT_SECONDS )); then
+  echo "ERROR: la espera minima entre batches es de ${MIN_WAIT_SECONDS} segundos (recibido: ${WAIT_SECONDS})." >&2
   exit 1
 fi
 
